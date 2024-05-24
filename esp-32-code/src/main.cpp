@@ -1,10 +1,12 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <Firebase_ESP_Client.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include <PZEM004Tv30.h>
+#include <Firebase_ESP_Client.h>
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
+#include <string>
 #include "constants.hpp"
 
 FirebaseData fbdo;
@@ -17,8 +19,12 @@ String uid;
 
 // Initialize NTP client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, NTP_UA_SERVER_NAME,
-                NTP_SERVER_TIME_OFFSET, NTP_UPDATE_INTERVAL);
+NTPClient timeClient(ntpUDP,
+                     NTP_UA_SERVER_NAME,
+                     NTP_SERVER_TIME_OFFSET,
+                     NTP_UPDATE_INTERVAL);
+
+PZEM004Tv30 pzem(Serial1, UART_RX, UART_TX);
 
 struct PZEM004tData
 {
@@ -38,6 +44,8 @@ struct TransferData
     String m_date;
     String m_time;
 };
+
+TransferData transferData;
 
 void wifiSetup()
 {
@@ -59,11 +67,14 @@ void wifiSetup()
     Serial.println("=== Connected to the WiFi ===");
     Serial.println(WiFi.localIP());
 
+    Serial.println("=== START SYNC TIME WITH NTP ===");
     timeClient.begin();
     while (!timeClient.update())
     {
+        Serial.print(".");
         timeClient.forceUpdate();
     }
+    Serial.println("=== END SYNC TIME WITH NTP ===");
 }
 
 void setupFireBase()
@@ -81,7 +92,8 @@ void setupFireBase()
 
     Firebase.begin(&config, &auth);
 
-    while ((auth.token.uid) == "") {
+    while ((auth.token.uid) == "")
+    {
         Serial.print('.');
         delay(1000);
     }
@@ -91,12 +103,12 @@ void setupFireBase()
     Serial.print(uid);
 }
 
-void getFormattedDateTime(String &date, String &time)
+void getFormattedDateTime(String& date, String& time)
 {
     timeClient.update();
     unsigned long rawTime = timeClient.getEpochTime();
     time_t timeT = static_cast<time_t>(rawTime);
-    struct tm *ti = localtime(&timeT);
+    struct tm* ti = localtime(&timeT);
 
     char dateBuffer[11]; // YYYY-MM-DD
     char timeBuffer[9];  // HH:MM:SS
@@ -111,63 +123,59 @@ void getFormattedDateTime(String &date, String &time)
 bool storeToDataBase()
 {
     static bool beHere = false;
-    TransferData data;
-    getFormattedDateTime(data.m_date, data.m_time);
+    getFormattedDateTime(transferData.m_date, transferData.m_time);
 
-    if (beHere)
-    {
-        beHere = false;
-        data.m_id = 1;
-        data.m_name = "iPhone";
-        data.m_pzemData.m_voltage = 0.5f;
-        data.m_pzemData.m_current = 0.02f;
-        data.m_pzemData.m_power = 2.0f;
-        data.m_pzemData.m_energy = 2.0f;
-    }
-    else
-    {
-        beHere = true;
-        data.m_id = 1;
-        data.m_name = "Phone";
-        data.m_pzemData.m_voltage = 0.10f;
-        data.m_pzemData.m_current = 0.2f;
-        data.m_pzemData.m_power = 2.3f;
-        data.m_pzemData.m_energy = 2.4f;
-    }
+    String rawDataPath =
+        "SensorData/" + transferData.m_date + "/" + transferData.m_time;
+    String dailySummaryPath = "DailySummaries/" + transferData.m_date;
+    String hourlySummaryPath = "HourlySummaries/" + transferData.m_date + "/"
+                               + transferData.m_time.substring(0, 2);
 
-    String rawDataPath = "SensorData/" + data.m_date + "/" + data.m_time;
-    String dailySummaryPath = "DailySummaries/" + data.m_date;
-    String hourlySummaryPath = "HourlySummaries/" + data.m_date + "/" + data.m_time.substring(0, 2);
-
-    // Store raw data
-    if (!Firebase.RTDB.setInt(&fbdo, rawDataPath + "/id", data.m_id))
+    // Store raw transferData
+    if (!Firebase.RTDB.setInt(&fbdo, rawDataPath + "/id", transferData.m_id))
     {
-        Serial.println("ERROR: failed to save id = " + String(data.m_id) + " - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to save id = " + String(transferData.m_id)
+                       + " - " + fbdo.errorReason());
         return false;
     }
-    if (!Firebase.RTDB.setString(&fbdo, rawDataPath + "/name", data.m_name.c_str()))
+    if (!Firebase.RTDB.setString(
+            &fbdo, rawDataPath + "/name", transferData.m_name.c_str()))
     {
-        Serial.println("ERROR: failed to save name = " + String(data.m_name.c_str()) + " - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to save name = "
+                       + String(transferData.m_name.c_str()) + " - "
+                       + fbdo.errorReason());
         return false;
     }
-    if (!Firebase.RTDB.setFloat(&fbdo, rawDataPath + "/voltage", data.m_pzemData.m_voltage))
+    if (!Firebase.RTDB.setFloat(
+            &fbdo, rawDataPath + "/voltage", transferData.m_pzemData.m_voltage))
     {
-        Serial.println("ERROR: failed to save voltage = " + String(data.m_pzemData.m_voltage) + " - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to save voltage = "
+                       + String(transferData.m_pzemData.m_voltage) + " - "
+                       + fbdo.errorReason());
         return false;
     }
-    if (!Firebase.RTDB.setFloat(&fbdo, rawDataPath + "/current", data.m_pzemData.m_current))
+    if (!Firebase.RTDB.setFloat(
+            &fbdo, rawDataPath + "/current", transferData.m_pzemData.m_current))
     {
-        Serial.println("ERROR: failed to save current = " + String(data.m_pzemData.m_current) + " - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to save current = "
+                       + String(transferData.m_pzemData.m_current) + " - "
+                       + fbdo.errorReason());
         return false;
     }
-    if (!Firebase.RTDB.setFloat(&fbdo, rawDataPath + "/power", data.m_pzemData.m_power))
+    if (!Firebase.RTDB.setFloat(
+            &fbdo, rawDataPath + "/power", transferData.m_pzemData.m_power))
     {
-        Serial.println("ERROR: failed to save power = " + String(data.m_pzemData.m_power) + " - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to save power = "
+                       + String(transferData.m_pzemData.m_power) + " - "
+                       + fbdo.errorReason());
         return false;
     }
-    if (!Firebase.RTDB.setFloat(&fbdo, rawDataPath + "/energy", data.m_pzemData.m_energy))
+    if (!Firebase.RTDB.setFloat(
+            &fbdo, rawDataPath + "/energy", transferData.m_pzemData.m_energy))
     {
-        Serial.println("ERROR: failed to save energy = " + String(data.m_pzemData.m_energy) + " - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to save energy = "
+                       + String(transferData.m_pzemData.m_energy) + " - "
+                       + fbdo.errorReason());
         return false;
     }
 
@@ -179,19 +187,26 @@ bool storeToDataBase()
     }
     else
     {
-        Serial.println("ERROR: failed to get daily total energy - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to get daily total energy - "
+                       + fbdo.errorReason());
     }
 
-    currentDailyTotalEnergy += data.m_pzemData.m_energy;
-    if (!Firebase.RTDB.setFloat(&fbdo, dailySummaryPath + "/total_energy", currentDailyTotalEnergy))
+    currentDailyTotalEnergy += transferData.m_pzemData.m_energy;
+    if (!Firebase.RTDB.setFloat(
+            &fbdo, dailySummaryPath + "/total_energy", currentDailyTotalEnergy))
     {
-        Serial.println("ERROR: failed to update daily total energy - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to update daily total energy - "
+                       + fbdo.errorReason());
         return false;
     }
 
-    if (!Firebase.RTDB.setString(&fbdo, dailySummaryPath + "/last_updated", data.m_date + " " + data.m_time))
+    if (!Firebase.RTDB.setString(&fbdo,
+                                 dailySummaryPath + "/last_updated",
+                                 transferData.m_date + " "
+                                     + transferData.m_time))
     {
-        Serial.println("ERROR: failed to update daily last updated - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to update daily last updated - "
+                       + fbdo.errorReason());
         return false;
     }
 
@@ -203,19 +218,27 @@ bool storeToDataBase()
     }
     else
     {
-        Serial.println("ERROR: failed to get hourly total energy - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to get hourly total energy - "
+                       + fbdo.errorReason());
     }
 
-    currentHourlyTotalEnergy += data.m_pzemData.m_energy;
-    if (!Firebase.RTDB.setFloat(&fbdo, hourlySummaryPath + "/total_energy", currentHourlyTotalEnergy))
+    currentHourlyTotalEnergy += transferData.m_pzemData.m_energy;
+    if (!Firebase.RTDB.setFloat(&fbdo,
+                                hourlySummaryPath + "/total_energy",
+                                currentHourlyTotalEnergy))
     {
-        Serial.println("ERROR: failed to update hourly total energy - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to update hourly total energy - "
+                       + fbdo.errorReason());
         return false;
     }
 
-    if (!Firebase.RTDB.setString(&fbdo, hourlySummaryPath + "/last_updated", data.m_date + " " + data.m_time))
+    if (!Firebase.RTDB.setString(&fbdo,
+                                 hourlySummaryPath + "/last_updated",
+                                 transferData.m_date + " "
+                                     + transferData.m_time))
     {
-        Serial.println("ERROR: failed to update hourly last updated - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to update hourly last updated - "
+                       + fbdo.errorReason());
         return false;
     }
 
@@ -227,25 +250,32 @@ bool storeToDataBase()
     }
     else
     {
-        Serial.println("ERROR: failed to get daily max power - " + fbdo.errorReason());
+        Serial.println("ERROR: failed to get daily max power - "
+                       + fbdo.errorReason());
     }
 
-    if (data.m_pzemData.m_power > currentMaxPower)
+    if (transferData.m_pzemData.m_power > currentMaxPower)
     {
-        if (!Firebase.RTDB.setFloat(&fbdo, dailySummaryPath + "/max_power", data.m_pzemData.m_power))
+        if (!Firebase.RTDB.setFloat(&fbdo,
+                                    dailySummaryPath + "/max_power",
+                                    transferData.m_pzemData.m_power))
         {
-            Serial.println("ERROR: failed to update max power - " + fbdo.errorReason());
+            Serial.println("ERROR: failed to update max power - "
+                           + fbdo.errorReason());
             return false;
         }
 
-        if (!Firebase.RTDB.setString(&fbdo, dailySummaryPath + "/max_power_time", data.m_time))
+        if (!Firebase.RTDB.setString(&fbdo,
+                                     dailySummaryPath + "/max_power_time",
+                                     transferData.m_time))
         {
-            Serial.println("ERROR: failed to update max power time - " + fbdo.errorReason());
+            Serial.println("ERROR: failed to update max power time - "
+                           + fbdo.errorReason());
             return false;
         }
     }
 
-    Serial.println("All data is saved successfully");
+    Serial.println("All transferData is saved successfully");
     return true;
 }
 
@@ -254,14 +284,75 @@ void setup()
     Serial.begin(115200);
     delay(100);
 
+    transferData.m_name = "pump";
+
     wifiSetup();
     setupFireBase();
 }
 
+bool getPZEMData2()
+{
+    static int counter = 1;
+
+    if (counter == 1)
+    {
+        transferData.m_pzemData.m_current = 0.10f;      // A
+        transferData.m_pzemData.m_power = 4.50f;        // W
+        transferData.m_pzemData.m_energy = 7.368f;      // kWh
+        transferData.m_pzemData.m_voltage = 229.60f;    // V
+        counter = 2;
+    }
+    else if (counter == 2)
+    {
+        transferData.m_pzemData.m_current = 0.09f;      // A
+        transferData.m_pzemData.m_power = 4.50f;        // W
+        transferData.m_pzemData.m_energy = 7.368f;      // kWh
+        transferData.m_pzemData.m_voltage = 229.60f;    // V
+        counter = 1;
+    }
+
+    return true;
+}
+
+bool getPZEMData()
+{
+    transferData.m_pzemData.m_current = pzem.current();
+    transferData.m_pzemData.m_power = pzem.power();
+    transferData.m_pzemData.m_energy = pzem.energy();
+    transferData.m_pzemData.m_voltage = pzem.energy();
+
+    if (isnan(transferData.m_pzemData.m_voltage))
+    {
+        Serial.println("Error reading voltage");
+        return false;
+    }
+
+    if (isnan(transferData.m_pzemData.m_current))
+    {
+        Serial.println("Error reading current");
+        return false;
+    }
+
+    if (isnan(transferData.m_pzemData.m_power))
+    {
+        Serial.println("Error reading power");
+        return false;
+    }
+
+    if (isnan(transferData.m_pzemData.m_energy))
+    {
+        Serial.println("Error reading energy");
+        return false;
+    }
+
+    return true;
+}
+
 void loop()
 {
-    if (Firebase.ready() && (((millis() - sendDataPrevMillis) > ONE_MINUTE)
-            || (sendDataPrevMillis == 0)))
+    if (Firebase.ready()
+        && (((millis() - sendDataPrevMillis) > ONE_MINUTE)
+            || (sendDataPrevMillis == 0)) && getPZEMData2())
     {
         sendDataPrevMillis = millis();
         if (!storeToDataBase())
