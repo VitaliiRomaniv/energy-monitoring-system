@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sensor Data</title>
+  <!-- Include Gauge.js library -->
+  <script src="https://cdn.jsdelivr.net/npm/raphael"></script>
+  <script src="https://cdn.jsdelivr.net/npm/justgage@1.4.0/dist/justgage.min.js"></script>
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .row {
+      display: flex;
+      justify-content: space-around;
+      width: 80%;
+      margin-bottom: 30px;
+    }
+    .column {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .gauge {
+      width: 200px;
+      height: 160px;
+      margin-bottom: 10px;
+    }
+    text {
+      display: none;
+    }
+    .title {
+      margin-bottom: 5px;
+      text-align: center;
+    }
+    .value {
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .unit {
+      text-align: center;
+    }
+    .flexing_upper {
+      position: absolute;
+      top: 350px;
+    }
+    .flexing_buttom {
+      position: absolute;
+      top: 580px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Sensor Data</h1>
+    <div id="name" class="subtitle"></div> <!-- Add this line for name -->
+    <div id="time" class="subtitle"></div> <!-- Add this line for time -->
+    <div class="row">
+      <!-- Current Gauge -->
+      <div class="column">
+        <div class="title">Current</div>
+        <div id="currentGauge" class="gauge"></div>
+        <div class="flexing_upper">
+          <div class="value" id="currentValue"></div>
+          <div class="unit">Amps</div>
+        </div>
+      </div>
+      <!-- Voltage Gauge -->
+      <div class="column">
+        <div class="title">Voltage</div>
+        <div id="voltageGauge" class="gauge"></div>
+        <div class="flexing_upper">
+          <div class="value" id="voltageValue"></div>
+          <div class="unit">Volts</div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <!-- Power Gauge -->
+      <div class="column">
+        <div class="title">Power</div>
+        <div id="powerGauge" class="gauge"></div>
+        <div class="flexing_buttom">
+          <div class="value" id="powerValue"></div>
+          <div class="unit">kW</div>
+        </div>
+      </div>
+      <!-- Energy Gauge -->
+      <div class="column">
+        <div class="title">Energy</div>
+        <div id="energyGauge" class="gauge"></div>
+        <div class="flexing_buttom">
+          <div class="value" id="energyValue"></div>
+          <div class="unit">kWh</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchSensorData() {
+      try {
+        const response = await fetch('/api/sensorData');
+        const data = await response.json();
+        const lastData = getLastData(data);
+        renderSensorData(lastData);
+      } catch (error) {
+        console.error('Error fetching sensor data:', error);
+      }
+    }
+  
+    function getLastData(data) {
+      const dates = Object.keys(data);
+      const lastDate = dates[dates.length - 1];
+      const times = Object.keys(data[lastDate]);
+      const lastTime = times[times.length - 1];
+      return { ...data[lastDate][lastTime], time: lastTime };
+    }
+  
+    function renderSensorData(data) {
+      console.log('Sensor Data:', data);
+  
+      // Render name
+      const nameElement = document.getElementById("name");
+      nameElement.innerText = `Name: ${data.name}`;
+  
+      // Render time
+      const timeElement = document.getElementById("time");
+      timeElement.innerText = `Time: ${data.time}`;
+  
+      // Render current gauge
+      const currentGauge = new JustGage({
+        id: "currentGauge",
+        value: data.current,
+        min: 0,
+        max: 100,
+        title: "Current"
+      });
+      const currentValue = document.getElementById("currentValue");
+      currentValue.innerText = data.current.toFixed(2);
+  
+      // Render voltage gauge
+      const voltageGauge = new JustGage({
+        id: "voltageGauge",
+        value: data.voltage,
+        min: 80,
+        max: 260,
+        title: "Voltage"
+      });
+      const voltageValue = document.getElementById("voltageValue");
+      voltageValue.innerText = data.voltage.toFixed(2);
+  
+      // Render power gauge
+      const powerGauge = new JustGage({
+        id: "powerGauge",
+        value: data.power,
+        min: 0,
+        max: 23,
+        title: "Power"
+      });
+      const powerValue = document.getElementById("powerValue");
+      powerValue.innerText = data.power.toFixed(2);
+  
+      // Render energy gauge
+      const energyGauge = new JustGage({
+        id: "energyGauge",
+        value: data.energy,
+        min: 0,
+        max: 100,
+        title: "Energy"
+      });
+      const energyValue = document.getElementById("energyValue");
+      energyValue.innerText = data.energy.toFixed(2);
+    }
+  
+    fetchSensorData();
+  </script>
+  
+</body>
+</html>
