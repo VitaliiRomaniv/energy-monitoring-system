@@ -1,6 +1,6 @@
 const express = require('express');
 const firebaseAdmin = require('firebase-admin');
-const path = require('path'); // Import the 'path' module
+const path = require('path');
 
 const app = express();
 
@@ -10,6 +10,9 @@ firebaseAdmin.initializeApp({
   credential: firebaseAdmin.credential.cert(serviceAccount),
   databaseURL: 'https://energymonitoringsystemproject-default-rtdb.europe-west1.firebasedatabase.app/'
 });
+
+// Middleware to serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // API endpoint to fetch last sensor data
 app.get('/api/sensorData', async (req, res) => {
@@ -23,8 +26,18 @@ app.get('/api/sensorData', async (req, res) => {
   }
 });
 
-// Middleware to serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
+// API endpoint to fetch Firebase config
+app.get('/firebase-config', (req, res) => {
+  res.json({
+    apiKey: "AIzaSyA5KJTztw4ZpqWyWZqgZh2cH8bnmPffeLU",
+    authDomain: "energymonitoringsystemproject.firebaseapp.com",
+    databaseURL: "https://energymonitoringsystemproject-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "energymonitoringsystemproject",
+    storageBucket: "energymonitoringsystemproject.appspot.com",
+    messagingSenderId: "300683444406",
+    appId: "1:300683444406:web:e32c11eeeb944ec0c3e617"
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

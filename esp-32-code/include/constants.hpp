@@ -17,19 +17,19 @@ constexpr uint32_t ONE_MINUTE = ONE_SECOND * 60;
 constexpr const char CONFIG_NAME[] = "default.cfg";
 
 // Wi-Fi setup
-constexpr const char WiFi_SSID[] = "";
+constexpr const char WiFi_SSID[] = "RomanivNetwork";
 constexpr const char WiFi_PASSWORD[] = "";
 
 // NTP setup
 
-constexpr const char NTP_UA_SERVER_NAME[] = "0.ua.pool.ntp.org";
-constexpr long NTP_SERVER_TIME_OFFSET = 3;
+constexpr const char NTP_UA_SERVER_NAME[] = "pool.ntp.org";
+constexpr long NTP_SERVER_TIME_OFFSET = 10800; // 3 Hours
 constexpr unsigned long NTP_UPDATE_INTERVAL = 60000; // 60 sec
 
 // // FireBase setup
 constexpr const char API_KEY[] = "";
 constexpr const char DATA_BASE_URL[] = "";
-constexpr const char EMAIL[] = "";
-constexpr const char EMAIL_PASSWORD[] = "";
+constexpr const char EMAIL[] = "gremxzwhynot@gmail.com";
+constexpr const char EMAIL_PASSWORD[] = "examplePassword123";
 
 #endif // CONSTANTS_H_

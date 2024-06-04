@@ -49,6 +49,7 @@ TransferData transferData;
 
 void wifiSetup()
 {
+    delay(5000);
     WiFi.begin(WiFi_SSID, WiFi_PASSWORD);
 
     Serial.println("=== Connected to WiFi ===");
@@ -63,7 +64,7 @@ void wifiSetup()
         Serial.print(".");
         delay(WiFi_CONNECT_DELAY);
     }
-
+    Serial.println();
     Serial.println("=== Connected to the WiFi ===");
     Serial.println(WiFi.localIP());
 
@@ -74,6 +75,7 @@ void wifiSetup()
         Serial.print(".");
         timeClient.forceUpdate();
     }
+    Serial.println();
     Serial.println("=== END SYNC TIME WITH NTP ===");
 }
 
@@ -95,12 +97,12 @@ void setupFireBase()
     while ((auth.token.uid) == "")
     {
         Serial.print('.');
-        delay(1000);
+        delay(ONE_SECOND);
     }
 
     uid = auth.token.uid.c_str();
     Serial.print("User UID: ");
-    Serial.print(uid);
+    Serial.println(uid);
 }
 
 void getFormattedDateTime(String& date, String& time)
@@ -131,7 +133,6 @@ bool storeToDataBase()
     String hourlySummaryPath = "HourlySummaries/" + transferData.m_date + "/"
                                + transferData.m_time.substring(0, 2);
 
-    // Store raw transferData
     if (!Firebase.RTDB.setInt(&fbdo, rawDataPath + "/id", transferData.m_id))
     {
         Serial.println("ERROR: failed to save id = " + String(transferData.m_id)
@@ -179,21 +180,8 @@ bool storeToDataBase()
         return false;
     }
 
-    // Update daily summary
-    float currentDailyTotalEnergy = 0;
-    if (Firebase.RTDB.getFloat(&fbdo, dailySummaryPath + "/total_energy"))
-    {
-        currentDailyTotalEnergy = fbdo.floatData();
-    }
-    else
-    {
-        Serial.println("ERROR: failed to get daily total energy - "
-                       + fbdo.errorReason());
-    }
-
-    currentDailyTotalEnergy += transferData.m_pzemData.m_energy;
     if (!Firebase.RTDB.setFloat(
-            &fbdo, dailySummaryPath + "/total_energy", currentDailyTotalEnergy))
+            &fbdo, dailySummaryPath + "/total_energy", transferData.m_pzemData.m_energy))
     {
         Serial.println("ERROR: failed to update daily total energy - "
                        + fbdo.errorReason());
@@ -210,22 +198,9 @@ bool storeToDataBase()
         return false;
     }
 
-    // Update hourly summary
-    float currentHourlyTotalEnergy = 0;
-    if (Firebase.RTDB.getFloat(&fbdo, hourlySummaryPath + "/total_energy"))
-    {
-        currentHourlyTotalEnergy = fbdo.floatData();
-    }
-    else
-    {
-        Serial.println("ERROR: failed to get hourly total energy - "
-                       + fbdo.errorReason());
-    }
-
-    currentHourlyTotalEnergy += transferData.m_pzemData.m_energy;
     if (!Firebase.RTDB.setFloat(&fbdo,
                                 hourlySummaryPath + "/total_energy",
-                                currentHourlyTotalEnergy))
+                                transferData.m_pzemData.m_energy))
     {
         Serial.println("ERROR: failed to update hourly total energy - "
                        + fbdo.errorReason());

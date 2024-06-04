@@ -3,184 +3,130 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sensor Data</title>
-  <!-- Include Gauge.js library -->
-  <script src="https://cdn.jsdelivr.net/npm/raphael"></script>
-  <script src="https://cdn.jsdelivr.net/npm/justgage@1.4.0/dist/justgage.min.js"></script>
+  <title>Sensor Data Readings</title>
   <style>
-    .container {
+    body {
+      background-color: #F5F5F5;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .data-head {
+      margin: auto;
+      width: 50%;
+      text-align: center;
+      font-size: 45px;
+      font-weight: bold;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: #FFF;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      border-radius: 20px;
+    }
+    .data-container {
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+      justify-content: space-between;
+      width: 50%;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: #FFF;
+      box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
     }
-    .row {
-      display: flex;
-      justify-content: space-around;
-      width: 80%;
-      margin-bottom: 30px;
-    }
-    .column {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .gauge {
-      width: 200px;
-      height: 160px;
-      margin-bottom: 10px;
-    }
-    text {
-      display: none;
-    }
-    .title {
-      margin-bottom: 5px;
+    .data-item {
       text-align: center;
     }
-    .value {
+    .data-item h2 {
       font-size: 24px;
       font-weight: bold;
-      text-align: center;
+      margin-bottom: 10px;
     }
-    .unit {
-      text-align: center;
-    }
-    .flexing_upper {
-      position: absolute;
-      top: 350px;
-    }
-    .flexing_buttom {
-      position: absolute;
-      top: 580px;
+    .data-item p {
+      font-size: 24px;
+      font-weight: bold;
+      color: #6EB7FF;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Sensor Data</h1>
-    <div id="name" class="subtitle"></div> <!-- Add this line for name -->
-    <div id="time" class="subtitle"></div> <!-- Add this line for time -->
-    <div class="row">
-      <!-- Current Gauge -->
-      <div class="column">
-        <div class="title">Current</div>
-        <div id="currentGauge" class="gauge"></div>
-        <div class="flexing_upper">
-          <div class="value" id="currentValue"></div>
-          <div class="unit">Amps</div>
-        </div>
-      </div>
-      <!-- Voltage Gauge -->
-      <div class="column">
-        <div class="title">Voltage</div>
-        <div id="voltageGauge" class="gauge"></div>
-        <div class="flexing_upper">
-          <div class="value" id="voltageValue"></div>
-          <div class="unit">Volts</div>
-        </div>
-      </div>
+
+  <div class="data-head">Sensor Realtime Readings</div>
+
+  <div class="data-container">
+    <div class="data-item">
+      <h2>Name</h2>
+      <p id="name">--</p>
     </div>
-    <div class="row">
-      <!-- Power Gauge -->
-      <div class="column">
-        <div class="title">Power</div>
-        <div id="powerGauge" class="gauge"></div>
-        <div class="flexing_buttom">
-          <div class="value" id="powerValue"></div>
-          <div class="unit">kW</div>
-        </div>
-      </div>
-      <!-- Energy Gauge -->
-      <div class="column">
-        <div class="title">Energy</div>
-        <div id="energyGauge" class="gauge"></div>
-        <div class="flexing_buttom">
-          <div class="value" id="energyValue"></div>
-          <div class="unit">kWh</div>
-        </div>
-      </div>
+    <div class="data-item">
+      <h2>Current</h2>
+      <p id="current">-- A</p>
+    </div>
+    <div class="data-item">
+      <h2>Voltage</h2>
+      <p id="voltage">-- V</p>
+    </div>
+    <div class="data-item">
+      <h2>Power</h2>
+      <p id="power">-- W</p>
+    </div>
+    <div class="data-item">
+      <h2>Energy</h2>
+      <p id="energy">-- kWh</p>
+    </div>
+    <div class="data-item">
+      <h2>Time</h2>
+      <p id="time">--</p>
     </div>
   </div>
 
+  <!-- Firebase CDN -->
+  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
+
   <script>
-    async function fetchSensorData() {
-      try {
-        const response = await fetch('/api/sensorData');
-        const data = await response.json();
-        const lastData = getLastData(data);
-        renderSensorData(lastData);
-      } catch (error) {
-        console.error('Error fetching sensor data:', error);
+    const firebaseConfig = {
+      apiKey: "AIzaSyA5KJTztw4ZpqWyWZqgZh2cH8bnmPffeLU",
+      authDomain: "energymonitoringsystemproject.firebaseapp.com",
+      databaseURL: "https://energymonitoringsystemproject-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "energymonitoringsystemproject",
+      storageBucket: "energymonitoringsystemproject",
+      messagingSenderId: "300683444406",
+      appId: "1:300683444406:web:e32c11eeeb944ec0c3e617"
+    };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = app.database();
+    const sensorDataRef = database.ref('SensorData/' + getTodayDate());
+
+    sensorDataRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const times = Object.keys(data);
+        const latestTime = times[times.length - 1];
+        const latestData = data[latestTime];
+
+        document.getElementById('name').innerText = latestData.name;
+        document.getElementById('current').innerText = latestData.current + " A";
+        document.getElementById('voltage').innerText = latestData.voltage + " V";
+        document.getElementById('power').innerText = latestData.power + " W";
+        document.getElementById('energy').innerText = latestData.energy + " kWh";
+        document.getElementById('time').innerText = latestTime;
       }
+    }, (error) => {
+      console.error('Error fetching data:', error);
+    });
+
+    function getTodayDate() {
+      const today = new Date();
+      const year = today.getFullYear();
+      let month = today.getMonth() + 1;
+      let day = today.getDate();
+      month = (month < 10) ? '0' + month : month;
+      day = (day < 10) ? '0' + day : day;
+      return `${year}-${month}-${day}`;
     }
-  
-    function getLastData(data) {
-      const dates = Object.keys(data);
-      const lastDate = dates[dates.length - 1];
-      const times = Object.keys(data[lastDate]);
-      const lastTime = times[times.length - 1];
-      return { ...data[lastDate][lastTime], time: lastTime };
-    }
-  
-    function renderSensorData(data) {
-      console.log('Sensor Data:', data);
-  
-      // Render name
-      const nameElement = document.getElementById("name");
-      nameElement.innerText = `Name: ${data.name}`;
-  
-      // Render time
-      const timeElement = document.getElementById("time");
-      timeElement.innerText = `Time: ${data.time}`;
-  
-      // Render current gauge
-      const currentGauge = new JustGage({
-        id: "currentGauge",
-        value: data.current,
-        min: 0,
-        max: 100,
-        title: "Current"
-      });
-      const currentValue = document.getElementById("currentValue");
-      currentValue.innerText = data.current.toFixed(2);
-  
-      // Render voltage gauge
-      const voltageGauge = new JustGage({
-        id: "voltageGauge",
-        value: data.voltage,
-        min: 80,
-        max: 260,
-        title: "Voltage"
-      });
-      const voltageValue = document.getElementById("voltageValue");
-      voltageValue.innerText = data.voltage.toFixed(2);
-  
-      // Render power gauge
-      const powerGauge = new JustGage({
-        id: "powerGauge",
-        value: data.power,
-        min: 0,
-        max: 23,
-        title: "Power"
-      });
-      const powerValue = document.getElementById("powerValue");
-      powerValue.innerText = data.power.toFixed(2);
-  
-      // Render energy gauge
-      const energyGauge = new JustGage({
-        id: "energyGauge",
-        value: data.energy,
-        min: 0,
-        max: 100,
-        title: "Energy"
-      });
-      const energyValue = document.getElementById("energyValue");
-      energyValue.innerText = data.energy.toFixed(2);
-    }
-  
-    fetchSensorData();
   </script>
-  
+
 </body>
 </html>
